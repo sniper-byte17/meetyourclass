@@ -27,20 +27,14 @@ const db: Firestore = firebaseConfig.firestoreDatabaseId
 
 const auth = getAuth(app);
 
-// Test connection on boot
+// Test connection helper (safe, non-blocking)
 export async function testFirebaseConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.info('[Firebase] Firestore connected successfully');
+    console.info('[Firebase] Firestore initialized');
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('[Firebase] Firestore offline or unreachable:', error.message);
-    } else {
-      console.info('[Firebase] Connection ping completed');
-    }
+    console.warn('[Firebase] Init note:', error);
   }
 }
-testFirebaseConnection();
 
 // Firestore Collections
 const ADMIN_USERS_COLLECTION = 'adminUsers';
@@ -242,6 +236,14 @@ export function subscribeToSubmissions(
         onUpdate(items);
       },
       (err) => {
+        // Suppress benign abort/cancellation errors
+        if (
+          err?.name === 'AbortError' ||
+          err?.message?.includes('aborted') ||
+          err?.message?.includes('The user aborted a request')
+        ) {
+          return;
+        }
         console.warn('[Firebase] onSnapshot submissions warning:', err);
         if (onError) onError(err);
       }

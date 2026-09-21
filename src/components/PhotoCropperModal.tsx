@@ -398,19 +398,28 @@ export const PhotoCropperModal: React.FC<PhotoCropperModalProps> = ({
       img.onerror = () => {
         // Fallback: try fetching as a blob with mode: 'cors'
         fetch(src, { mode: 'cors' })
-          .then((res) => res.blob())
+          .then((res) => {
+            if (!res.ok) throw new Error('Fetch failed');
+            return res.blob();
+          })
           .then((blob) => {
             const blobUrl = URL.createObjectURL(blob);
             const fallback = new Image();
             fallback.onload = () => resolve(fallback);
-            fallback.onerror = reject;
+            fallback.onerror = () => {
+              const direct = new Image();
+              direct.onload = () => resolve(direct);
+              direct.onerror = (e) => reject(e);
+              direct.src = src;
+            };
             fallback.src = blobUrl;
           })
-          .catch(() => {
-            // Direct load fallback
+          .catch((err) => {
+            // If aborted or failed CORS, safely fallback to direct image load without rejecting
+            if (err?.name === 'AbortError') return;
             const direct = new Image();
             direct.onload = () => resolve(direct);
-            direct.onerror = reject;
+            direct.onerror = (e) => reject(e);
             direct.src = src;
           });
       };
