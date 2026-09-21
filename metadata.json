@@ -1,0 +1,6 @@
+{
+  "name": "MeetFutureClass",
+  "description": "Connect with your future college classmates, find roommates, and get officially featured on your university campus Instagram network.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

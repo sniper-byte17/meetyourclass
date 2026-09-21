@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "Admin User",
+      "description": "Authorized campus managers and page moderators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["super_admin", "campus_manager", "moderator"] },
+        "assignedSchoolId": { "type": "string" },
+        "addedAt": { "type": "string" },
+        "addedBy": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["email", "name", "role", "status"]
+    },
+    "Submission": {
+      "title": "Student Submission",
+      "description": "Student bio and photo submission for university Instagram feature posting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "instagram": { "type": "string" },
+        "tiktok": { "type": "string" },
+        "gradYear": { "type": "number" },
+        "major": { "type": "string" },
+        "hometown": { "type": "string" },
+        "bio": { "type": "string" },
+        "lookingFor": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "photoUrl": { "type": "string" },
+        "tier": { "type": "string", "enum": ["instant", "48hours", "5days"] },
+        "price": { "type": "number" },
+        "status": { "type": "string", "enum": ["queued", "approved", "posted", "rejected"] },
+        "paymentStatus": { "type": "string", "enum": ["paid", "pending", "free"] },
+        "paymentMethod": { "type": "string" },
+        "paymentHandle": { "type": "string" },
+        "caption": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "instagram", "photoUrl", "tier", "status"]
+    },
+    "Profile": {
+      "title": "Student Profile",
+      "description": "Student profile visible in the campus network directory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "gradYear": { "type": "number" },
+        "major": { "type": "string" },
+        "location": { "type": "string" },
+        "bio": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "instagram": { "type": "string" },
+        "tiktok": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["schoolId", "name", "gradYear", "major"]
+    },
+    "SchoolRequest": {
+      "title": "Campus Request",
+      "description": "User request to add a new university Instagram network",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "cityState": { "type": "string" },
+        "igHandle": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "requestedAt": { "type": "string" }
+      },
+      "required": ["schoolName", "requestedAt"]
+    }
+  },
+  "firestore": {
+    "adminUsers": {
+      "schema": "AdminUser",
+      "description": "Collection of authorized admin users and campus managers"
+    },
+    "submissions": {
+      "schema": "Submission",
+      "description": "Collection of student submissions queued for Instagram feature posting"
+    },
+    "profiles": {
+      "schema": "Profile",
+      "description": "Collection of campus networking profiles"
+    },
+    "schoolRequests": {
+      "schema": "SchoolRequest",
+      "description": "Collection of requests for new university campuses"
+    }
+  }
+}

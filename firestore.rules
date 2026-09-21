@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.\\@]+$');
+    }
+
+    function isValidSubmission(data) {
+      return data.keys().hasAll(['name', 'instagram', 'photoUrl', 'tier', 'status']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.instagram is string && data.instagram.size() > 0 && data.instagram.size() <= 60 &&
+        data.photoUrl is string && data.photoUrl.size() > 0 && data.photoUrl.size() <= 5000 &&
+        data.tier in ['instant', '48hours', '5days'] &&
+        data.status in ['queued', 'approved', 'posted', 'rejected'];
+    }
+
+    function isValidProfile(data) {
+      return data.keys().hasAll(['schoolId', 'name', 'gradYear', 'major']) &&
+        data.schoolId is string && data.schoolId.size() > 0 && data.schoolId.size() <= 60 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.gradYear is number &&
+        data.major is string && data.major.size() <= 120;
+    }
+
+    function isValidSchoolRequest(data) {
+      return data.keys().hasAll(['schoolName', 'requestedAt']) &&
+        data.schoolName is string && data.schoolName.size() > 0 && data.schoolName.size() <= 150 &&
+        data.requestedAt is string && data.requestedAt.size() <= 50;
+    }
+
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['email', 'name', 'role', 'status']) &&
+        data.email is string && data.email.size() > 3 && data.email.size() <= 120 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.role in ['super_admin', 'campus_manager', 'moderator'] &&
+        data.status in ['active', 'inactive'];
+    }
+
+    // Admin Users collection
+    match /adminUsers/{adminId} {
+      allow read: if true;
+      allow create, update: if isValidId(adminId) && isValidAdminUser(request.resource.data);
+      allow delete: if isValidId(adminId);
+    }
+
+    // Submissions collection (Instagram feature queue)
+    match /submissions/{submissionId} {
+      allow read: if true;
+      allow create: if isValidId(submissionId) && isValidSubmission(request.resource.data);
+      allow update: if isValidId(submissionId) && request.resource.data.status in ['queued', 'approved', 'posted', 'rejected'];
+      allow delete: if isValidId(submissionId);
+    }
+
+    // Profiles collection (campus directory)
+    match /profiles/{profileId} {
+      allow read: if true;
+      allow create: if isValidId(profileId) && isValidProfile(request.resource.data);
+      allow update: if isValidId(profileId) && isValidProfile(request.resource.data);
+      allow delete: if isValidId(profileId);
+    }
+
+    // Campus requests collection
+    match /schoolRequests/{requestId} {
+      allow read: if true;
+      allow create: if isValidId(requestId) && isValidSchoolRequest(request.resource.data);
+      allow update, delete: if isValidId(requestId);
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+  }
+}
