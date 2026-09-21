@@ -24,6 +24,7 @@ import {
   Check,
   Music2,
   Palette,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { School, Profile, UserRole, PostingSpeedTier, PaymentMode } from '../types';
 import { SAMPLE_AVATARS } from '../data/schoolsData';
@@ -33,6 +34,7 @@ import { CheckoutPayment } from './CheckoutPayment';
 import { PhotoCropperModal } from './PhotoCropperModal';
 import { api } from '../services/api';
 import { motion, AnimatePresence } from 'motion/react';
+import { getSchoolMainPageUrl, getSchoolPostingUrl } from '../utils/schoolLinks';
 
 interface SchoolPostingFlowProps {
   school: School;
@@ -93,6 +95,8 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
   const [isCustomMajor, setIsCustomMajor] = useState<boolean>(false);
   const [selectedLocationHub, setSelectedLocationHub] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showIgLinksModal, setShowIgLinksModal] = useState<boolean>(false);
+  const [copiedLinkType, setCopiedLinkType] = useState<string | null>(null);
 
   const cleanHandle = instagram.trim().replace('@', '');
   const cleanTikTok = tiktok.trim().replace('@', '');
@@ -524,14 +528,26 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
     <div className="max-w-4xl mx-auto py-6 sm:py-8 px-4 sm:px-6 space-y-8">
       {/* Top Breadcrumb & School Badge */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 pb-5">
-        <button
-          id="btn-back-to-schools"
-          onClick={onBackToSchools}
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-neutral-600 hover:text-neutral-900 group transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform text-neutral-400 group-hover:text-neutral-900" />
-          <span>Change School / Directory</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            id="btn-back-to-schools"
+            onClick={onBackToSchools}
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-neutral-600 hover:text-neutral-900 group transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform text-neutral-400 group-hover:text-neutral-900" />
+            <span>All Campuses</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowIgLinksModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            title="Get Link 1 and Link 2 for this school's Instagram Bio"
+          >
+            <LinkIcon className="w-3.5 h-3.5" />
+            <span>Copy IG Bio Links</span>
+          </button>
+        </div>
 
         {/* School Identifier */}
         <div className="flex items-center gap-3">
@@ -1431,6 +1447,146 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
         onClose={() => setIsCropperOpen(false)}
         onCropComplete={handleCropComplete}
       />
+
+      {/* IG Bio Links Dialog for this Campus */}
+      <AnimatePresence>
+        {showIgLinksModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-neutral-200 space-y-4 text-xs"
+            >
+              <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center">
+                    <Instagram className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-neutral-900 text-sm">
+                      Instagram Bio Links for {school.shortName}
+                    </h3>
+                    <p className="text-[11px] text-neutral-500">
+                      Copy these two links to put in your @{igPageHandle.replace('@', '')} bio
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowIgLinksModal(false)}
+                  className="p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Link 1: Main Page */}
+              <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-neutral-900 text-xs flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-neutral-900 text-white flex items-center justify-center text-[10px]">
+                      1
+                    </span>
+                    <span>Link 1: Main Page / Campus Hub</span>
+                  </span>
+                  <span className="text-[10px] text-neutral-500 font-medium">Browse Classmates</span>
+                </div>
+                <p className="text-[11px] text-neutral-600">
+                  Takes students to explore the full campus directory and meet future classmates.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={typeof window !== 'undefined' ? `${window.location.origin}/?school=${school.id}` : ''}
+                    className="flex-1 px-2.5 py-1.5 rounded-xl bg-white border border-neutral-300 font-mono text-[11px] text-neutral-800"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = `${window.location.origin}/?school=${school.id}`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedLinkType('main');
+                      setTimeout(() => setCopiedLinkType(null), 3000);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
+                      copiedLinkType === 'main'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-neutral-900 hover:bg-black text-white'
+                    }`}
+                  >
+                    {copiedLinkType === 'main' ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Link 1</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Link 2: Direct Post & Submit */}
+              <div className="p-3.5 rounded-2xl bg-pink-50/70 border border-pink-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-pink-900 text-xs flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-pink-600 text-white flex items-center justify-center text-[10px]">
+                      2
+                    </span>
+                    <span>Link 2: Direct Post & Submit</span>
+                  </span>
+                  <span className="text-[10px] text-pink-700 font-bold">Fast-Track Form</span>
+                </div>
+                <p className="text-[11px] text-neutral-600">
+                  Directly opens this submission wizard so students can upload their photo, bio, and submit immediately.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={typeof window !== 'undefined' ? `${window.location.origin}/?school=${school.id}&post=1` : ''}
+                    className="flex-1 px-2.5 py-1.5 rounded-xl bg-white border border-pink-300 font-mono text-[11px] text-pink-950"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = `${window.location.origin}/?school=${school.id}&post=1`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedLinkType('post');
+                      setTimeout(() => setCopiedLinkType(null), 3000);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
+                      copiedLinkType === 'post'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-pink-600 hover:bg-pink-700 text-white'
+                    }`}
+                  >
+                    {copiedLinkType === 'post' ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Link 2</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-neutral-500 bg-neutral-100 p-2.5 rounded-xl">
+                💡 <strong>Instagram Tip:</strong> You can add multiple links directly in your Instagram bio! Go to <em>Edit Profile &rarr; Links &rarr; Add external link</em> and add both links with clean titles.
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

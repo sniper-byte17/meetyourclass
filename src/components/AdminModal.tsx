@@ -31,11 +31,13 @@ import {
   ArrowUpRight,
   Link as LinkIcon,
   CheckCheck,
+  Globe,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { School, StudentSubmission, AdminUser } from '../types';
 import { api, AdminMetrics } from '../services/api';
 import { SchoolPhotoTemplate, generateTemplatedCanvas, getSchoolIgTag } from './SchoolPhotoTemplate';
+import { getSchoolMainPageUrl, getSchoolPostingUrl } from '../utils/schoolLinks';
 import {
   subscribeToSubmissions,
   getAdminUsersFromFirebase,
@@ -101,6 +103,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [previewSub, setPreviewSub] = useState<StudentSubmission | null>(null);
   const [galleryViewMode, setGalleryViewMode] = useState<'templated' | 'original'>('templated');
+  const [customDomainInput, setCustomDomainInput] = useState<string>('');
+  const [copiedLinkType, setCopiedLinkType] = useState<string | null>(null);
+  const [showDomainGuide, setShowDomainGuide] = useState(false);
 
   // New admin form state
   const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -1277,35 +1282,250 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
             </div>
           )}
 
-          {/* TAB 3: Active Campuses */}
+          {/* TAB 3: Active Campuses & Instagram Bio Links Generator */}
           {activeTab === 'schools' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">
-                {schools.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center justify-between p-3 rounded-2xl border border-neutral-200 bg-neutral-50/70 text-xs"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-xs"
-                        style={{ backgroundColor: s.accentColor }}
-                      >
-                        {s.shortName.slice(0, 2)}
-                      </div>
-                      <div>
-                        <p className="font-bold text-neutral-900">{s.name}</p>
-                        <p className="text-[11px] text-pink-600 font-medium">
-                          {s.instagramHandle || `@${s.shortName.toLowerCase()}2031`}
-                        </p>
-                      </div>
+            <div className="space-y-4">
+              {/* Instagram Bio Links Generator & Domain Bar */}
+              <div className="p-4 bg-gradient-to-r from-pink-50 via-purple-50 to-neutral-50 rounded-2xl border border-pink-200/80 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-pink-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Instagram className="w-4 h-4" />
                     </div>
-                    <div className="text-right">
-                      <span className="font-extrabold text-neutral-900">{s.memberCount}</span>
-                      <span className="text-neutral-400 block text-[10px]">members</span>
+                    <div>
+                      <h4 className="text-xs font-black text-neutral-900 uppercase tracking-wider">
+                        Instagram Bio Links Generator
+                      </h4>
+                      <p className="text-[11px] text-neutral-600">
+                        Generate and copy the two links for each campus Instagram page bio.
+                      </p>
                     </div>
                   </div>
-                ))}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowDomainGuide(!showDomainGuide)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-bold shadow-2xs transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-blue-600" />
+                    <span>{showDomainGuide ? 'Hide Domain Guide' : 'Custom Domain Setup Guide'}</span>
+                  </button>
+                </div>
+
+                {/* Custom Domain Input for Link Generation */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1 text-xs">
+                  <label className="text-neutral-700 font-bold sm:shrink-0 flex items-center gap-1">
+                    <span>Target Domain for Links:</span>
+                  </label>
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={customDomainInput}
+                      onChange={(e) => setCustomDomainInput(e.target.value)}
+                      placeholder={typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}
+                      className="w-full px-3 py-1.5 rounded-xl bg-white border border-neutral-300 text-neutral-900 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-mono"
+                    />
+                  </div>
+                  {customDomainInput && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomDomainInput('')}
+                      className="px-2 py-1 text-[11px] text-neutral-500 hover:text-neutral-800 underline cursor-pointer"
+                    >
+                      Reset to Current Host
+                    </button>
+                  )}
+                </div>
+
+                {/* Explanatory badge */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-neutral-600 bg-white/80 p-2.5 rounded-xl border border-pink-100">
+                  <div className="flex items-start gap-1.5">
+                    <span className="font-extrabold text-neutral-900 bg-neutral-100 px-1.5 py-0.5 rounded text-[10px]">
+                      Link 1
+                    </span>
+                    <div>
+                      <strong className="text-neutral-800">Main Page / Campus Hub:</strong> Takes students to browse classmates and view the full campus directory.
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <span className="font-extrabold text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded text-[10px]">
+                      Link 2
+                    </span>
+                    <div>
+                      <strong className="text-neutral-800">Direct Post & Submit:</strong> Instantly opens the photo upload & checkout form for that specific school.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step-by-Step Custom Domain Guide Accordion */}
+              {showDomainGuide && (
+                <div className="p-4 bg-neutral-900 text-white rounded-2xl border border-neutral-800 space-y-3 text-xs animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                    <span className="font-black tracking-wider uppercase text-pink-400 flex items-center gap-1.5">
+                      <Globe className="w-4 h-4" />
+                      How to Point a Custom Domain to This Application
+                    </span>
+                    <button
+                      onClick={() => setShowDomainGuide(false)}
+                      className="text-neutral-400 hover:text-white cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 text-neutral-300 leading-relaxed">
+                    <p>
+                      <strong>Step 1: Buy Your Domain</strong><br />
+                      Purchase your chosen domain (e.g. <code className="bg-neutral-800 px-1.5 py-0.5 rounded text-pink-300">classof2031.com</code> or <code className="bg-neutral-800 px-1.5 py-0.5 rounded text-pink-300">meetyourclass.com</code>) from any registrar (Namecheap, Cloudflare, GoDaddy, or Google Cloud Domains).
+                    </p>
+                    <p>
+                      <strong>Step 2: Map Custom Domain in Google Cloud Run</strong><br />
+                      In Google Cloud Console, navigate to <strong>Cloud Run &rarr; Manage Custom Domains &rarr; Add Mapping</strong>. Select this service and type your domain name. Cloud Run will provide you with DNS records (an <strong>A record</strong> pointing to Google Cloud IP addresses or a <strong>CNAME record</strong> for subdomains).
+                    </p>
+                    <p>
+                      <strong>Step 3: Update DNS Records at Registrar</strong><br />
+                      Log into your registrar/DNS provider (Cloudflare, Namecheap, etc.) and add the DNS records provided in Step 2. Cloud Run automatically provisions free managed SSL certificates within 10–20 minutes.
+                    </p>
+                    <p>
+                      <strong>Step 4: Add Links into Instagram Bio</strong><br />
+                      Instagram allows adding multiple links in any profile bio! On each school’s IG profile (e.g. <code>@emory2031</code>), tap <em>Edit Profile &rarr; Links &rarr; Add External Link</em> and paste Link 1 and Link 2 below!
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Schools list with one-click copy buttons */}
+              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                {schools.map((s) => {
+                  const effectiveBase = (customDomainInput.trim()
+                    ? (customDomainInput.startsWith('http') ? customDomainInput.trim() : `https://${customDomainInput.trim()}`)
+                    : (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
+
+                  const mainPageUrl = `${effectiveBase}/?school=${encodeURIComponent(s.id)}`;
+                  const directPostUrl = `${effectiveBase}/?school=${encodeURIComponent(s.id)}&post=1`;
+
+                  const isCopiedMain = copiedLinkType === `${s.id}_main`;
+                  const isCopiedPost = copiedLinkType === `${s.id}_post`;
+
+                  return (
+                    <div
+                      key={s.id}
+                      className="p-3.5 rounded-2xl border border-neutral-200 bg-white hover:border-neutral-300 transition-all shadow-2xs space-y-2.5 text-xs"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs text-white shrink-0 shadow-xs"
+                            style={{ backgroundColor: s.accentColor }}
+                          >
+                            {s.shortName.slice(0, 2)}
+                          </div>
+                          <div>
+                            <p className="font-extrabold text-neutral-900">{s.name}</p>
+                            <p className="text-[11px] text-pink-600 font-semibold flex items-center gap-1">
+                              <Instagram className="w-3 h-3" />
+                              {s.instagramHandle || `@${s.shortName.toLowerCase()}2031`}
+                              <span className="text-neutral-400 font-normal ml-1">
+                                • {s.memberCount} members
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Quick preview button */}
+                        <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                          <a
+                            href={mainPageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+                            title="Preview school hub"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* The Two IG Bio Links */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-neutral-100">
+                        {/* Link 1: Main Page */}
+                        <div className="p-2 rounded-xl bg-neutral-50 border border-neutral-200/80 flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] font-extrabold text-neutral-500 uppercase tracking-wider block">
+                              Link 1: Main Page / Hub
+                            </span>
+                            <span className="text-[11px] font-mono text-neutral-800 truncate block">
+                              {mainPageUrl}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(mainPageUrl);
+                              setCopiedLinkType(`${s.id}_main`);
+                              setTimeout(() => setCopiedLinkType(null), 3000);
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
+                              isCopiedMain
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-white hover:bg-neutral-200 text-neutral-700 border border-neutral-200'
+                            }`}
+                          >
+                            {isCopiedMain ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3 text-neutral-500" />
+                                <span>Copy Link 1</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Link 2: Direct Post & Feature Form */}
+                        <div className="p-2 rounded-xl bg-pink-50/70 border border-pink-200/80 flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] font-extrabold text-pink-700 uppercase tracking-wider block">
+                              Link 2: Direct Post Form
+                            </span>
+                            <span className="text-[11px] font-mono text-pink-950 truncate block">
+                              {directPostUrl}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(directPostUrl);
+                              setCopiedLinkType(`${s.id}_post`);
+                              setTimeout(() => setCopiedLinkType(null), 3000);
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
+                              isCopiedPost
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-pink-600 hover:bg-pink-700 text-white shadow-2xs'
+                            }`}
+                          >
+                            {isCopiedPost ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Copy Link 2</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

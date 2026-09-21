@@ -9,6 +9,7 @@ import { INITIAL_SCHOOLS, INITIAL_PROFILES } from './data/schoolsData';
 import { School, Profile } from './types';
 import { CheckCircle2, Instagram, Shield } from 'lucide-react';
 import { api } from './services/api';
+import { parseCurrentUrl } from './utils/schoolLinks';
 
 const STORAGE_PROFILES_KEY = 'classmateconnect_custom_profiles_v1';
 const STORAGE_SCHOOLS_KEY = 'classmateconnect_custom_schools_v1';
@@ -71,18 +72,22 @@ export default function App() {
     loadBackendData();
   }, []);
 
-  // Check initial URL hash / path
+  // Check initial URL hash / path / search query params
   useEffect(() => {
-    const hash = window.location.hash.toLowerCase();
-    const pathname = window.location.pathname.toLowerCase();
+    const handleUrlRoute = () => {
+      const parsed = parseCurrentUrl(schools);
+      if (parsed.school) {
+        setSelectedSchool(parsed.school);
+      }
+      setCurrentView(parsed.view);
+    };
 
-    if (pathname.includes('submit') || hash.includes('submit') || hash.includes('emory2031')) {
-      const emory = schools.find((s) => s.id === 'emory') || schools[0];
-      setSelectedSchool(emory);
-      setCurrentView('post');
-    } else if (hash.includes('schools')) {
-      setCurrentView('schools');
-    }
+    handleUrlRoute();
+
+    window.addEventListener('popstate', handleUrlRoute);
+    return () => {
+      window.removeEventListener('popstate', handleUrlRoute);
+    };
   }, [schools]);
 
   // Save custom profiles
@@ -111,12 +116,25 @@ export default function App() {
   const handleSelectSchool = (school: School) => {
     setSelectedSchool(school);
     setCurrentView('post');
+    // Update browser URL so students can bookmark or share the direct link
+    try {
+      const newUrl = `${window.location.pathname}?school=${encodeURIComponent(school.id)}&post=1`;
+      window.history.pushState({ schoolId: school.id, view: 'post' }, '', newUrl);
+    } catch {
+      // noop
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNavigateToSchools = () => {
     if (currentView !== 'schools') {
       setCurrentView('schools');
+      try {
+        const cleanUrl = window.location.pathname.startsWith('/post') ? '/' : window.location.pathname;
+        window.history.pushState({ view: 'schools' }, '', cleanUrl);
+      } catch {
+        // noop
+      }
       setTimeout(() => {
         document.getElementById('schools')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -184,6 +202,12 @@ export default function App() {
             school={selectedSchool}
             onBackToSchools={() => {
               setCurrentView('schools');
+              try {
+                const cleanUrl = window.location.pathname.startsWith('/post') ? '/' : window.location.pathname;
+                window.history.pushState({ view: 'schools' }, '', cleanUrl);
+              } catch {
+                // noop
+              }
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSubmitProfile={handleSaveProfile}
