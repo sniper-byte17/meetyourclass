@@ -89,9 +89,14 @@ export interface StudentSubmission {
   tier: PostingSpeedTier;
   price: number;
   status: 'queued' | 'approved' | 'posted' | 'rejected';
-  paymentStatus: 'paid' | 'pending' | 'free';
+  paymentStatus: 'paid' | 'pending' | 'free' | 'pending_verification' | 'unverified' | 'rejected';
   paymentMethod: PaymentMode;
   paymentHandle?: string;
+  paymentProofType?: 'screenshot' | 'link';
+  paymentProofUrl?: string; // base64 receipt screenshot or venmo transaction link
+  paymentProofNote?: string;
+  paymentVerifiedAt?: string;
+  paymentVerifiedBy?: string;
   caption: string;
 }
 

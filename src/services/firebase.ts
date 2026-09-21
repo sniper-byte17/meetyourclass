@@ -148,6 +148,27 @@ export async function updateSubmissionStatusInFirebase(
   }
 }
 
+export async function updateSubmissionPaymentInFirebase(
+  id: string,
+  paymentStatus: StudentSubmission['paymentStatus'],
+  verifiedBy?: string,
+  extra?: Partial<StudentSubmission>
+): Promise<void> {
+  try {
+    const docRef = doc(db, SUBMISSIONS_COLLECTION, id);
+    const updates: Record<string, any> = {
+      paymentStatus,
+      ...(paymentStatus === 'paid' ? { paymentVerifiedAt: new Date().toISOString() } : {}),
+      ...(verifiedBy ? { paymentVerifiedBy: verifiedBy } : {}),
+      ...(extra || {}),
+    };
+    await updateDoc(docRef, updates);
+  } catch (err) {
+    console.error('[Firebase] Failed to update submission payment status:', err);
+    throw err;
+  }
+}
+
 export async function deleteSubmissionInFirebase(id: string): Promise<void> {
   try {
     const docRef = doc(db, SUBMISSIONS_COLLECTION, id);

@@ -13,7 +13,7 @@ service cloud.firestore {
         data.instagram is string && data.instagram.size() > 0 && data.instagram.size() <= 60 &&
         data.photoUrl is string && data.photoUrl.size() > 0 && data.photoUrl.size() <= 5000 &&
         data.tier in ['instant', '48hours', '5days'] &&
-        data.status in ['queued', 'approved', 'posted', 'rejected'];
+        data.status in ['queued', 'approved', 'posted', 'rejected', 'pending_verification'];
     }
 
     function isValidProfile(data) {
@@ -49,7 +49,7 @@ service cloud.firestore {
     match /submissions/{submissionId} {
       allow read: if true;
       allow create: if isValidId(submissionId) && isValidSubmission(request.resource.data);
-      allow update: if isValidId(submissionId) && request.resource.data.status in ['queued', 'approved', 'posted', 'rejected'];
+      allow update: if isValidId(submissionId) && request.resource.data.status in ['queued', 'approved', 'posted', 'rejected', 'pending_verification'];
       allow delete: if isValidId(submissionId);
     }
 

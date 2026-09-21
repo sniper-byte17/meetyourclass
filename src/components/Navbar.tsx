@@ -70,6 +70,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 group-hover:text-pink-600" />
             <span>Help</span>
           </button>
+
+          {onOpenAdmin && (
+            <button
+              id="nav-link-admin-portal"
+              onClick={onOpenAdmin}
+              className="text-neutral-700 hover:text-pink-600 transition-colors cursor-pointer py-1 px-1.5 rounded-lg hover:bg-pink-50/50 flex items-center gap-1.5 whitespace-nowrap"
+              title="Campus Admin Portal"
+            >
+              <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-500" />
+              <span>Admin Portal</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

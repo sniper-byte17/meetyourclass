@@ -99,6 +99,22 @@ apiRouter.patch('/submissions/:id/status', (req, res) => {
   }
 });
 
+apiRouter.patch('/submissions/:id/payment', (req, res) => {
+  try {
+    const { paymentStatus, verifiedBy } = req.body;
+    if (!paymentStatus) {
+      return res.status(400).json({ success: false, error: 'paymentStatus is required' });
+    }
+    const updated = storage.updateSubmissionPayment(req.params.id, paymentStatus, verifiedBy);
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Submission not found' });
+    }
+    res.json({ success: true, message: `Submission payment status updated to ${paymentStatus}`, data: updated });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to update submission payment' });
+  }
+});
+
 apiRouter.delete('/submissions/:id', (req, res) => {
   try {
     const deleted = storage.deleteSubmission(req.params.id);
@@ -167,6 +183,30 @@ apiRouter.post('/payments/verify', (req, res) => {
 });
 
 // Admin Metrics endpoints
+apiRouter.post('/admin/login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const cleanUser = (username || '').toString().trim().toLowerCase();
+    const cleanPass = (password || '').toString().trim();
+
+    if ((cleanUser === 'mato' || cleanUser === 'pato') && cleanPass === '#NewChapter') {
+      return res.json({
+        success: true,
+        user: cleanUser,
+        role: 'super_admin',
+        message: 'Admin authenticated successfully',
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid credentials. Please verify your username and password.',
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Login error' });
+  }
+});
+
 apiRouter.get('/admin/metrics', (req, res) => {
   try {
     const metrics = storage.getAdminMetrics();

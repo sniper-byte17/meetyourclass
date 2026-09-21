@@ -16,12 +16,21 @@ import {
   Filter,
   Download,
   Eye,
+  EyeOff,
   Image as ImageIcon,
   Sparkles,
   Layers,
   UserPlus,
   UserCheck,
   Mail,
+  Lock,
+  KeyRound,
+  User,
+  LogOut,
+  FileCheck,
+  ArrowUpRight,
+  Link as LinkIcon,
+  CheckCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { School, StudentSubmission, AdminUser } from '../types';
@@ -41,6 +50,42 @@ interface AdminModalProps {
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools }) => {
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      const savedAuth = sessionStorage.getItem('meetfutureclass_admin_auth');
+      if (savedAuth) {
+        const parsed = JSON.parse(savedAuth);
+        if (parsed?.authenticated && (parsed?.user === 'mato' || parsed?.user === 'pato')) {
+          return true;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  });
+
+  const [currentAdminUser, setCurrentAdminUser] = useState<string>(() => {
+    try {
+      const savedAuth = sessionStorage.getItem('meetfutureclass_admin_auth');
+      if (savedAuth) {
+        const parsed = JSON.parse(savedAuth);
+        if (parsed?.user) return parsed.user;
+      }
+    } catch {
+      // ignore
+    }
+    return 'mato';
+  });
+
+  // Login form state
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [activeTab, setActiveTab] = useState<'queue' | 'pictures' | 'admins' | 'schools'>('queue');
   const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
@@ -48,6 +93,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
   const [isLoading, setIsLoading] = useState(false);
   const [filterSchoolId, setFilterSchoolId] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>('all');
+  const [selectedReceiptSub, setSelectedReceiptSub] = useState<StudentSubmission | null>(null);
+  const [isVerifyingPaymentId, setIsVerifyingPaymentId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -60,6 +108,64 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
   const [newAdminRole, setNewAdminRole] = useState<AdminUser['role']>('campus_manager');
   const [newAdminSchool, setNewAdminSchool] = useState<string>('all');
   const [isAddingAdmin, setIsAddingAdmin] = useState(false);
+
+  // Handle Admin Login submission
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setIsLoggingIn(true);
+
+    const cleanUser = loginUsername.trim().toLowerCase();
+    const cleanPass = loginPassword.trim();
+
+    // Required credentials:
+    // Username: "mato" or "pato"
+    // Password: "#NewChapter"
+    const validUsers = ['mato', 'pato'];
+    const validPassword = '#NewChapter';
+
+    if (!validUsers.includes(cleanUser) || cleanPass !== validPassword) {
+      setTimeout(() => {
+        setIsLoggingIn(false);
+        setLoginError('Invalid login details. Please check your username and password.');
+      }, 350);
+      return;
+    }
+
+    try {
+      // Also notify backend session endpoint if accessible
+      await api.adminLogin(cleanUser, cleanPass);
+    } catch {
+      // Fallback works directly
+    }
+
+    setIsLoggingIn(false);
+    setIsAuthenticated(true);
+    setCurrentAdminUser(cleanUser);
+    try {
+      sessionStorage.setItem(
+        'meetfutureclass_admin_auth',
+        JSON.stringify({ authenticated: true, user: cleanUser, loginTime: new Date().toISOString() })
+      );
+    } catch {
+      // ignore quota or disabled storage
+    }
+    setLoginPassword('');
+    setLoginError(null);
+  };
+
+  // Handle Admin Logout
+  const handleLogout = () => {
+    try {
+      sessionStorage.removeItem('meetfutureclass_admin_auth');
+    } catch {
+      // ignore
+    }
+    setIsAuthenticated(false);
+    setLoginUsername('');
+    setLoginPassword('');
+    setLoginError(null);
+  };
 
   const fetchBackendData = async () => {
     setIsLoading(true);
@@ -96,7 +202,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
         role: newAdminRole,
         assignedSchoolId: newAdminSchool,
         addedAt: new Date().toISOString(),
-        addedBy: 'Martin Muthomi',
+        addedBy: currentAdminUser === 'mato' ? 'Mato' : 'Pato',
         status: 'active',
       };
 
@@ -126,8 +232,78 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
     }
   };
 
+  const handleApprovePayment = async (sub: StudentSubmission) => {
+    setIsVerifyingPaymentId(sub.id);
+    try {
+      await api.updateSubmissionPayment(sub.id, 'paid', currentAdminUser, {
+        status: sub.status === 'queued' ? 'approved' : sub.status,
+      });
+
+      setSubmissions((prev) =>
+        prev.map((s) =>
+          s.id === sub.id
+            ? {
+                ...s,
+                paymentStatus: 'paid',
+                paymentVerifiedAt: new Date().toISOString(),
+                paymentVerifiedBy: currentAdminUser,
+                status: s.status === 'queued' ? 'approved' : s.status,
+              }
+            : s
+        )
+      );
+
+      setActionMessage(`✓ Payment of $${sub.price} approved for ${sub.name} by @${currentAdminUser}! Submission is approved.`);
+      setTimeout(() => setActionMessage(null), 4000);
+      if (selectedReceiptSub?.id === sub.id) {
+        setSelectedReceiptSub(null);
+      }
+    } catch (err) {
+      console.error('Failed to approve payment:', err);
+      setActionMessage('Failed to approve payment. Please retry.');
+    } finally {
+      setIsVerifyingPaymentId(null);
+    }
+  };
+
+  const handleRejectPayment = async (sub: StudentSubmission) => {
+    if (!confirm(`Are you sure you want to decline the payment proof for ${sub.name}?`)) {
+      return;
+    }
+    setIsVerifyingPaymentId(sub.id);
+    try {
+      await api.updateSubmissionPayment(sub.id, 'rejected', currentAdminUser, {
+        status: 'rejected',
+      });
+
+      setSubmissions((prev) =>
+        prev.map((s) =>
+          s.id === sub.id
+            ? {
+                ...s,
+                paymentStatus: 'rejected',
+                status: 'rejected',
+                paymentVerifiedBy: currentAdminUser,
+              }
+            : s
+        )
+      );
+
+      setActionMessage(`Payment proof declined for ${sub.name}.`);
+      setTimeout(() => setActionMessage(null), 4000);
+      if (selectedReceiptSub?.id === sub.id) {
+        setSelectedReceiptSub(null);
+      }
+    } catch (err) {
+      console.error('Failed to decline payment:', err);
+      setActionMessage('Failed to decline payment. Please retry.');
+    } finally {
+      setIsVerifyingPaymentId(null);
+    }
+  };
+
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !isAuthenticated) return;
     fetchBackendData();
 
     // Real-time Firestore subscription
@@ -140,6 +316,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
         if (filterStatus !== 'all') {
           filtered = filtered.filter((s) => s.status === filterStatus);
         }
+        if (filterPaymentStatus !== 'all') {
+          if (filterPaymentStatus === 'pending_verification') {
+            filtered = filtered.filter(
+              (s) => s.paymentStatus === 'pending_verification' || s.paymentStatus === 'pending'
+            );
+          } else {
+            filtered = filtered.filter((s) => s.paymentStatus === filterPaymentStatus);
+          }
+        }
         setSubmissions(filtered);
       }
     });
@@ -147,9 +332,156 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [isOpen, filterSchoolId, filterStatus]);
+  }, [isOpen, isAuthenticated, filterSchoolId, filterStatus, filterPaymentStatus]);
 
   if (!isOpen) return null;
+
+  // If not authenticated, prompt for admin credentials
+  if (!isAuthenticated) {
+    return (
+      <AnimatePresence>
+        <div id="admin-login-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs">
+          <motion.div
+            id="admin-login-modal"
+            initial={{ opacity: 0, scale: 0.95, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 16 }}
+            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-neutral-200 relative overflow-hidden"
+          >
+            {/* Top Close Button */}
+            <button
+              id="admin-login-close-btn"
+              onClick={onClose}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+              title="Close modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header / Brand */}
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shadow-md mb-3.5">
+                <Lock className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-extrabold text-neutral-900 tracking-tight">
+                Admin Portal Login
+              </h3>
+              <p className="text-xs text-neutral-500 mt-1 max-w-xs">
+                Enter your authorized credentials to manage submissions, downloads, and campus queues.
+              </p>
+            </div>
+
+            {/* Login Form */}
+            <form onSubmit={handleLogin} className="space-y-4">
+              {loginError && (
+                <div
+                  id="admin-login-error-alert"
+                  className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2 animate-in fade-in"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span className="font-medium">{loginError}</span>
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="admin-login-username"
+                  className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5"
+                >
+                  Username
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    id="admin-login-username"
+                    type="text"
+                    autoFocus
+                    required
+                    value={loginUsername}
+                    onChange={(e) => {
+                      setLoginUsername(e.target.value);
+                      if (loginError) setLoginError(null);
+                    }}
+                    placeholder="Enter username (mato or pato)"
+                    className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-xl text-sm text-neutral-900 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-pink-500 focus:bg-white transition-all font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="admin-login-password"
+                  className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+                    <KeyRound className="w-4 h-4" />
+                  </div>
+                  <input
+                    id="admin-login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={loginPassword}
+                    onChange={(e) => {
+                      setLoginPassword(e.target.value);
+                      if (loginError) setLoginError(null);
+                    }}
+                    placeholder="Enter password"
+                    className="w-full pl-10 pr-11 py-2.5 bg-neutral-50 border border-neutral-300 rounded-xl text-sm text-neutral-900 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-pink-500 focus:bg-white transition-all font-medium"
+                  />
+                  <button
+                    id="admin-login-toggle-password"
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  id="admin-login-submit-btn"
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {isLoggingIn ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Verifying credentials...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-4 h-4" />
+                      <span>Access Admin Portal</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="text-center pt-2">
+                <button
+                  id="admin-login-cancel-btn"
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs text-neutral-500 hover:text-neutral-800 transition-colors cursor-pointer font-medium"
+                >
+                  Cancel and return to site
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      </AnimatePresence>
+    );
+  }
 
   const handleUpdateStatus = async (id: string, status: StudentSubmission['status']) => {
     try {
@@ -282,7 +614,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
             </div>
 
             <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 border border-neutral-200 text-xs font-semibold text-neutral-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Admin: <strong className="text-pink-600 font-bold">@{currentAdminUser}</strong></span>
+              </div>
               <button
+                id="admin-logout-btn"
+                onClick={handleLogout}
+                title="Log out and lock Admin Portal"
+                className="px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-neutral-700 border border-neutral-200 flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5 text-neutral-500 hover:text-red-600" />
+                <span className="hidden xs:inline">Log out</span>
+              </button>
+              <button
+                id="admin-refresh-data-btn"
                 onClick={fetchBackendData}
                 disabled={isLoading}
                 title="Refresh backend data"
@@ -291,6 +637,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
               <button
+                id="admin-modal-close-btn"
                 onClick={onClose}
                 className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
               >
@@ -308,32 +655,48 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
           )}
 
           {/* Metrics summary cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 bg-neutral-50 rounded-2xl border border-neutral-200 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="p-3 bg-neutral-50 rounded-2xl border border-neutral-200 text-center">
               <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Queue Total</p>
-              <p className="text-xl sm:text-2xl font-black text-neutral-900 mt-0.5">
-                {metrics?.totalSubmissions ?? submissions.length}
+              <p className="text-xl font-black text-neutral-900 mt-0.5">
+                {submissions.length}
               </p>
             </div>
 
-            <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200/80 text-center">
-              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Pending Posts</p>
-              <p className="text-xl sm:text-2xl font-black text-amber-900 mt-0.5">
-                {metrics?.pendingQueue ?? submissions.filter((s) => s.status === 'queued').length}
+            <div className={`p-3 rounded-2xl border text-center transition-colors ${
+              submissions.filter((s) => s.paymentStatus === 'pending_verification' || s.paymentStatus === 'pending').length > 0
+                ? 'bg-amber-500/10 border-amber-300'
+                : 'bg-neutral-50 border-neutral-200'
+            }`}>
+              <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider flex items-center justify-center gap-1">
+                <span>Awaiting Payment</span>
+                {submissions.filter((s) => s.paymentStatus === 'pending_verification' || s.paymentStatus === 'pending').length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                )}
+              </p>
+              <p className="text-xl font-black text-amber-900 mt-0.5">
+                {submissions.filter((s) => s.paymentStatus === 'pending_verification' || s.paymentStatus === 'pending').length}
               </p>
             </div>
 
-            <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200/80 text-center">
+            <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200/80 text-center">
+              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Approved Ready</p>
+              <p className="text-xl font-black text-blue-900 mt-0.5">
+                {submissions.filter((s) => s.status === 'approved').length}
+              </p>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200/80 text-center">
               <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Posted on IG</p>
-              <p className="text-xl sm:text-2xl font-black text-emerald-900 mt-0.5">
+              <p className="text-xl font-black text-emerald-900 mt-0.5">
                 {metrics?.postedCount ?? submissions.filter((s) => s.status === 'posted').length}
               </p>
             </div>
 
-            <div className="p-3.5 bg-pink-50 rounded-2xl border border-pink-200/80 text-center">
-              <p className="text-[10px] font-bold text-pink-700 uppercase tracking-wider">Revenue Collected</p>
-              <p className="text-xl sm:text-2xl font-black text-pink-950 mt-0.5">
-                ${metrics?.verifiedRevenue ?? submissions.reduce((acc, s) => acc + (s.price || 0), 0)}
+            <div className="p-3 bg-pink-50 rounded-2xl border border-pink-200/80 text-center col-span-2 sm:col-span-1">
+              <p className="text-[10px] font-bold text-pink-700 uppercase tracking-wider">Verified Revenue</p>
+              <p className="text-xl font-black text-pink-950 mt-0.5">
+                ${submissions.filter((s) => s.paymentStatus === 'paid').reduce((acc, s) => acc + (s.price || 0), 0)}
               </p>
             </div>
           </div>
@@ -418,11 +781,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="px-2.5 py-1.5 rounded-xl bg-white border border-neutral-200 text-neutral-800 font-medium cursor-pointer"
                   >
-                    <option value="all">All Statuses</option>
+                    <option value="all">All Post Statuses</option>
                     <option value="queued">Queued (Pending)</option>
-                    <option value="approved">Approved</option>
+                    <option value="approved">Approved Ready</option>
                     <option value="posted">Posted to IG</option>
                     <option value="rejected">Rejected</option>
+                  </select>
+
+                  <select
+                    value={filterPaymentStatus}
+                    onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-xl bg-white border border-neutral-200 text-neutral-800 font-bold cursor-pointer"
+                  >
+                    <option value="all">All Payments</option>
+                    <option value="pending_verification">⚠️ Awaiting Payment Proof ({submissions.filter((s) => s.paymentStatus === 'pending_verification' || s.paymentStatus === 'pending').length})</option>
+                    <option value="paid">✓ Verified Paid</option>
+                    <option value="rejected">✕ Payment Declined</option>
                   </select>
                 </div>
               </div>
@@ -536,6 +910,130 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
                         </p>
                       )}
 
+                      {/* Payment Proof & Verification Panel */}
+                      <div className={`p-3 rounded-2xl border transition-all text-xs ${
+                        sub.paymentStatus === 'paid'
+                          ? 'bg-emerald-50/80 border-emerald-200'
+                          : sub.paymentStatus === 'rejected'
+                          ? 'bg-rose-50/80 border-rose-200'
+                          : 'bg-amber-50/90 border-amber-300 shadow-2xs'
+                      }`}>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-extrabold uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                                {sub.paymentStatus === 'paid' ? (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span className="text-emerald-900 font-bold">Payment Verified</span>
+                                  </>
+                                ) : sub.paymentStatus === 'rejected' ? (
+                                  <>
+                                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                                    <span className="text-rose-900 font-bold">Payment Proof Rejected</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                    <span className="text-amber-900 font-bold">Payment Review Pending</span>
+                                  </>
+                                )}
+                              </span>
+
+                              <span className="px-2 py-0.5 rounded-md bg-white border border-neutral-200 text-neutral-800 font-bold text-[10px]">
+                                {sub.paymentMethod?.toUpperCase() || 'VENMO'} (${sub.price})
+                              </span>
+
+                              {sub.paymentHandle && (
+                                <span className="text-[11px] text-neutral-600 font-medium">
+                                  Sender: <strong className="text-neutral-900">{sub.paymentHandle}</strong>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Proof details & notes */}
+                            {sub.paymentProofNote && (
+                              <p className="text-[11px] text-neutral-600 italic">
+                                Note: &ldquo;{sub.paymentProofNote}&rdquo;
+                              </p>
+                            )}
+
+                            {sub.paymentVerifiedBy && sub.paymentStatus === 'paid' && (
+                              <p className="text-[10px] text-emerald-700">
+                                Verified by <strong>@{sub.paymentVerifiedBy}</strong>
+                                {sub.paymentVerifiedAt && ` on ${new Date(sub.paymentVerifiedAt).toLocaleDateString()}`}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Action controls & proof viewer */}
+                          <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
+                            {/* If screenshot exists */}
+                            {sub.paymentProofUrl && (sub.paymentProofType === 'screenshot' || sub.paymentProofUrl.startsWith('data:image')) && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReceiptSub(sub)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-pink-600" />
+                                <span>Inspect Receipt</span>
+                              </button>
+                            )}
+
+                            {/* If link exists */}
+                            {sub.paymentProofUrl && sub.paymentProofType === 'link' && (
+                              <a
+                                href={sub.paymentProofUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                              >
+                                <span>Open Payment Link</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+
+                            {/* If no proof uploaded at all */}
+                            {!sub.paymentProofUrl && sub.paymentStatus !== 'paid' && (
+                              <span className="text-[11px] text-amber-800 font-medium bg-amber-100/80 px-2 py-1 rounded-lg">
+                                No receipt/link attached
+                              </span>
+                            )}
+
+                            {/* Approve / Reject buttons */}
+                            {sub.paymentStatus !== 'paid' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isVerifyingPaymentId === sub.id}
+                                  onClick={() => handleApprovePayment(sub)}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Approve Payment (${sub.price})</span>
+                                </button>
+
+                                {sub.paymentStatus !== 'rejected' && (
+                                  <button
+                                    type="button"
+                                    disabled={isVerifyingPaymentId === sub.id}
+                                    onClick={() => handleRejectPayment(sub)}
+                                    className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-xs transition-all cursor-pointer"
+                                  >
+                                    Decline
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold">
+                                <CheckCheck className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>Verified Paid</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Actions toolbar */}
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-100 text-xs font-medium">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -573,21 +1071,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
                             <Download className="w-3 h-3" />
                             <span>Raw Photo</span>
                           </button>
-
-                          {sub.paymentHandle && (
-                            <span className="text-[11px] text-neutral-500">
-                              Paid via {sub.paymentMethod}: <strong>{sub.paymentHandle}</strong>
-                            </span>
-                          )}
                         </div>
 
                         <div className="flex items-center gap-1.5">
                           {sub.status !== 'approved' && sub.status !== 'posted' && (
                             <button
-                              onClick={() => handleUpdateStatus(sub.id, 'approved')}
+                              onClick={() => {
+                                if (sub.paymentStatus !== 'paid') {
+                                  handleApprovePayment(sub);
+                                } else {
+                                  handleUpdateStatus(sub.id, 'approved');
+                                }
+                              }}
                               className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold transition-colors cursor-pointer"
                             >
-                              Approve
+                              {sub.paymentStatus !== 'paid' ? 'Approve & Verify' : 'Approve'}
                             </button>
                           )}
 
@@ -1038,6 +1536,128 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, schools
                   >
                     <Download className="w-3.5 h-3.5 text-neutral-600" />
                     <span>Raw Photo</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Modal: Payment Receipt / Proof Verification Lightbox */}
+        {selectedReceiptSub && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-neutral-200 space-y-4 max-h-[92vh] overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center">
+                    <FileCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-neutral-900 text-base">
+                      Payment Verification Proof
+                    </h4>
+                    <p className="text-xs text-neutral-500">
+                      Verify receipt or transaction for {selectedReceiptSub.name} (@{selectedReceiptSub.instagram})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedReceiptSub(null)}
+                  className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-600 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Order / Payment Summary Banner */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-neutral-50 p-3 rounded-2xl border border-neutral-200 text-xs">
+                <div>
+                  <span className="text-[10px] text-neutral-500 font-bold uppercase block">Campus</span>
+                  <span className="font-bold text-neutral-900 truncate block">{selectedReceiptSub.school?.name}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-neutral-500 font-bold uppercase block">Tier & Price</span>
+                  <span className="font-bold text-pink-600 block">
+                    {selectedReceiptSub.tier.toUpperCase()} (${selectedReceiptSub.price})
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-neutral-500 font-bold uppercase block">Payment App</span>
+                  <span className="font-bold text-emerald-700 block">{selectedReceiptSub.paymentMethod.toUpperCase()}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-neutral-500 font-bold uppercase block">Sender Handle</span>
+                  <span className="font-bold text-neutral-900 block truncate">
+                    {selectedReceiptSub.paymentHandle || 'Not provided'}
+                  </span>
+                </div>
+              </div>
+
+              {selectedReceiptSub.paymentProofNote && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
+                  <span className="font-bold">Student Note/Memo: </span>
+                  <span>&ldquo;{selectedReceiptSub.paymentProofNote}&rdquo;</span>
+                </div>
+              )}
+
+              {/* Receipt Image / Proof Visualizer */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-neutral-700">
+                  <span>Attached Screenshot / Receipt</span>
+                  {selectedReceiptSub.paymentProofUrl?.startsWith('data:') && (
+                    <span className="text-neutral-500 text-[11px]">Uploaded by student</span>
+                  )}
+                </div>
+
+                {selectedReceiptSub.paymentProofUrl ? (
+                  <div className="max-h-96 rounded-2xl overflow-hidden border border-neutral-200 bg-neutral-100 flex items-center justify-center p-2">
+                    <img
+                      src={selectedReceiptSub.paymentProofUrl}
+                      alt={`Receipt from ${selectedReceiptSub.name}`}
+                      referrerPolicy="no-referrer"
+                      className="max-h-88 max-w-full object-contain rounded-xl shadow-sm"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-neutral-50 rounded-2xl border border-dashed border-neutral-300 space-y-1">
+                    <p className="text-xs font-bold text-neutral-700">No screenshot image attached</p>
+                    <p className="text-[11px] text-neutral-500">
+                      Check sender handle or payment note: {selectedReceiptSub.paymentHandle}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions Footer */}
+              <div className="pt-2 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-xs text-neutral-500">
+                  Reviewing as <strong className="text-pink-600 font-bold">@{currentAdminUser}</strong>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    disabled={isVerifyingPaymentId === selectedReceiptSub.id}
+                    onClick={() => handleRejectPayment(selectedReceiptSub)}
+                    className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-neutral-100 hover:bg-rose-50 text-rose-700 font-bold text-xs transition-colors cursor-pointer border border-neutral-200 hover:border-rose-300"
+                  >
+                    Decline Receipt
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isVerifyingPaymentId === selectedReceiptSub.id}
+                    onClick={() => handleApprovePayment(selectedReceiptSub)}
+                    className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Approve Payment (${selectedReceiptSub.price})</span>
                   </button>
                 </div>
               </div>

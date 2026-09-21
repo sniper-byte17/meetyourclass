@@ -159,43 +159,81 @@ class StorageManager {
       tier: data.tier || 'instant',
       price: data.price ?? (data.tier === 'instant' ? 10 : data.tier === '48hours' ? 7 : 5),
       status: 'queued',
-      paymentStatus: data.paymentStatus || 'paid',
-      paymentMethod: data.paymentMethod || 'cashapp',
+      paymentStatus: data.paymentStatus || 'pending_verification',
+      paymentMethod: data.paymentMethod || 'venmo',
       paymentHandle: data.paymentHandle || '',
+      paymentProofType: data.paymentProofType,
+      paymentProofUrl: data.paymentProofUrl,
+      paymentProofNote: data.paymentProofNote,
+      paymentVerifiedAt: data.paymentVerifiedAt,
+      paymentVerifiedBy: data.paymentVerifiedBy,
       caption: data.caption || `Welcome to ${school.name}!`,
     };
 
     this.submissions.unshift(newSubmission);
 
-    // Also sync to active networking profiles
+    // If paid or free, sync to active networking profiles immediately
+    if (newSubmission.paymentStatus === 'paid' || newSubmission.paymentStatus === 'free') {
+      this.syncSubmissionToProfile(newSubmission);
+    }
+
+    return newSubmission;
+  }
+
+  private syncSubmissionToProfile(sub: StudentSubmission) {
+    const existing = this.profiles.find((p) => p.id === `prof_${sub.id}`);
+    if (existing) return;
+
     const newProfile: Profile = {
-      id: `prof_${id}`,
-      schoolId: school.id,
-      name: newSubmission.name,
+      id: `prof_${sub.id}`,
+      schoolId: sub.school.id,
+      name: sub.name,
       role: 'student',
-      gradYear: newSubmission.gradYear,
-      major: newSubmission.major,
-      location: newSubmission.hometown,
-      bio: newSubmission.bio,
-      tags: newSubmission.tags,
-      instagram: newSubmission.instagram,
-      tiktok: newSubmission.tiktok,
-      photoUrl: newSubmission.photoUrl,
+      gradYear: sub.gradYear,
+      major: sub.major,
+      location: sub.hometown,
+      bio: sub.bio,
+      tags: sub.tags,
+      instagram: sub.instagram,
+      tiktok: sub.tiktok,
+      photoUrl: sub.photoUrl,
       createdAt: new Date().toISOString().split('T')[0],
       isUserSubmission: true,
     };
     this.profiles.unshift(newProfile);
 
     // Increment school member count
-    const schoolIndex = this.schools.findIndex((s) => s.id === school.id);
+    const schoolIndex = this.schools.findIndex((s) => s.id === sub.school.id);
     if (schoolIndex !== -1) {
       this.schools[schoolIndex] = {
         ...this.schools[schoolIndex],
         memberCount: (this.schools[schoolIndex].memberCount || 0) + 1,
       };
     }
+  }
 
-    return newSubmission;
+  updateSubmissionPayment(
+    id: string,
+    paymentStatus: StudentSubmission['paymentStatus'],
+    verifiedBy?: string
+  ): StudentSubmission | null {
+    const index = this.submissions.findIndex((s) => s.id === id);
+    if (index === -1) return null;
+
+    const current = this.submissions[index];
+    this.submissions[index] = {
+      ...current,
+      paymentStatus,
+      paymentVerifiedAt: paymentStatus === 'paid' ? new Date().toISOString() : current.paymentVerifiedAt,
+      paymentVerifiedBy: verifiedBy || current.paymentVerifiedBy,
+      status: paymentStatus === 'paid' && current.status === 'queued' ? 'approved' : current.status,
+    };
+
+    if (paymentStatus === 'paid') {
+      this.syncSubmissionToProfile(this.submissions[index]);
+    }
+
+    return this.submissions[index];
   }
 
   updateSubmissionStatus(id: string, status: StudentSubmission['status']): StudentSubmission | null {

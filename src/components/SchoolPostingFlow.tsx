@@ -256,7 +256,7 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
           setCurrentViewMode('confirmed');
           window.scrollTo({ top: 0, behavior: 'smooth' });
 
-          // Send submission to backend
+          // Send submission to backend with pending verification
           api.createSubmission({
             school,
             name: name.trim() || 'New Student',
@@ -272,9 +272,12 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
             tier: orderData.tier,
             price: orderData.amount,
             status: 'queued',
-            paymentStatus: 'paid',
+            paymentStatus: 'pending_verification',
             paymentMethod: orderData.mode,
-            paymentHandle: orderData.paymentNote,
+            paymentHandle: orderData.senderHandleOrName || orderData.paymentNote,
+            paymentProofType: orderData.paymentProofType,
+            paymentProofUrl: orderData.paymentProofUrl,
+            paymentProofNote: orderData.paymentNote,
             caption: formattedCaption,
           }).catch((err) => {
             console.warn('Backend submission sync note:', err);
@@ -342,13 +345,13 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold uppercase tracking-wider">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Payment Submitted • Queue Ticket #{completedOrder?.orderId || 'CC-2031'}</span>
+            <span>Payment Proof Submitted • Queue Ticket #{completedOrder?.orderId || 'CC-2031'}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
             You&apos;re Queued for <span className="text-pink-600">{igPageHandle}</span>!
           </h1>
           <p className="text-sm sm:text-base text-neutral-600 max-w-xl mx-auto">
-            Your profile card and payment ({tierDetails.price} via {modeLabel}) have been received. We are preparing your official feature post for the {school.name} Class of {gradYear} page.
+            Your profile card and proof of payment ({tierDetails.price} via {modeLabel}) have been submitted. Our campus administrators review your receipt or link and will publish your feature post according to your selected timeframe.
           </p>
         </div>
 

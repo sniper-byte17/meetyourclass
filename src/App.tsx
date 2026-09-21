@@ -261,11 +261,12 @@ export default function App() {
             </button>
             <span>•</span>
             <button
+              id="footer-admin-portal-btn"
               onClick={() => setIsAdminOpen(true)}
               className="inline-flex items-center gap-1 text-neutral-800 hover:text-pink-600 transition-colors cursor-pointer font-bold"
             >
               <Shield className="w-3 h-3 text-pink-500" />
-              <span>Admin Queue</span>
+              <span>Admin Portal</span>
             </button>
           </div>
         </div>
