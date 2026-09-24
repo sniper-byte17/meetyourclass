@@ -20,11 +20,11 @@ interface ConnectModalProps {
 }
 
 export const ConnectModal: React.FC<ConnectModalProps> = ({ profile, school, onClose }) => {
-  if (!profile) return null;
-
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<number>(0);
   const [copiedMessage, setCopiedMessage] = useState(false);
+
+  if (!profile) return null;
 
   const schoolName = school?.shortName || 'our university';
 

@@ -32,6 +32,7 @@
         "lookingFor": { "type": "string" },
         "tags": { "type": "array", "items": { "type": "string" } },
         "photoUrl": { "type": "string" },
+        "photoUrls": { "type": "array", "items": { "type": "string" } },
         "tier": { "type": "string", "enum": ["instant", "48hours", "5days"] },
         "price": { "type": "number" },
         "status": { "type": "string", "enum": ["queued", "approved", "posted", "rejected"] },

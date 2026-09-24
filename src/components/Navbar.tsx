@@ -1,5 +1,5 @@
 import React from 'react';
-import { HelpCircle, Instagram, Shield } from 'lucide-react';
+import { HelpCircle, Instagram, Shield, Globe, Lock } from 'lucide-react';
 import { School } from '../types';
 
 interface NavbarProps {
@@ -9,7 +9,6 @@ interface NavbarProps {
   onNavigateToSchools: () => void;
   onNavigateToSteps: () => void;
   onOpenHelp: () => void;
-  onOpenAdmin?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -19,7 +18,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigateToSchools,
   onNavigateToSteps,
   onOpenHelp,
-  onOpenAdmin,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200/80 shadow-xs">
@@ -44,12 +42,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </button>
 
-        {/* Top Links */}
-        <div className="flex items-center gap-3 sm:gap-6 text-xs sm:text-sm font-semibold text-neutral-700 shrink-0">
+        {/* Top Links - Clean customer navigation */}
+        <div className="flex items-center gap-2 sm:gap-5 text-xs sm:text-sm font-semibold text-neutral-700 shrink-0">
           <button
             id="nav-link-how-it-works"
             onClick={onNavigateToSteps}
-            className="hover:text-pink-600 transition-colors cursor-pointer py-1 px-1 whitespace-nowrap"
+            className="hover:text-pink-600 transition-colors cursor-pointer py-1 px-1 whitespace-nowrap hidden sm:inline-block"
           >
             How it works
           </button>
@@ -65,23 +63,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="nav-link-help"
             onClick={onOpenHelp}
-            className="hover:text-pink-600 transition-colors cursor-pointer py-1 px-1 flex items-center gap-1.5 whitespace-nowrap"
+            className="hover:text-pink-600 transition-colors cursor-pointer py-1 px-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-lg hover:bg-neutral-100"
+            title="Help and FAQs"
           >
             <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 group-hover:text-pink-600" />
-            <span>Help</span>
+            <span className="hidden sm:inline">Help</span>
           </button>
-
-          {onOpenAdmin && (
-            <button
-              id="nav-link-admin-portal"
-              onClick={onOpenAdmin}
-              className="text-neutral-700 hover:text-pink-600 transition-colors cursor-pointer py-1 px-1.5 rounded-lg hover:bg-pink-50/50 flex items-center gap-1.5 whitespace-nowrap"
-              title="Campus Admin Portal"
-            >
-              <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-500" />
-              <span>Admin Portal</span>
-            </button>
-          )}
         </div>
       </div>
     </header>

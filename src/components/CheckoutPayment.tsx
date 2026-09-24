@@ -320,6 +320,26 @@ export const CheckoutPayment: React.FC<CheckoutPaymentProps> = ({
             </div>
 
             <div className="space-y-3 pt-1">
+              {/* Promotional Header Badge above $10 Option */}
+              <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 rounded-2xl p-3.5 text-white shadow-sm flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4 text-yellow-200 animate-pulse" />
+                  </div>
+                  <div>
+                    <p className="text-xs sm:text-sm font-extrabold tracking-wide text-white">
+                      Free Posting for first 50 posts
+                    </p>
+                    <p className="text-[11px] text-white/90 font-medium leading-tight">
+                      🎉 Special Launch Promotion active! The first 50 verified campus submissions get priority feature posting.
+                    </p>
+                  </div>
+                </div>
+                <span className="shrink-0 px-2.5 py-1 rounded-full bg-white text-rose-600 text-[10px] font-black tracking-wider uppercase shadow-xs">
+                  50 Free Posts
+                </span>
+              </div>
+
               {SPEED_TIERS.map((tier) => {
                 const isSelected = selectedTier === tier.id;
                 return (
@@ -334,6 +354,12 @@ export const CheckoutPayment: React.FC<CheckoutPaymentProps> = ({
                         : 'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50/50'
                     }`}
                   >
+                    {tier.id === 'instant' && (
+                      <div className="absolute -top-2.5 right-4 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[10px] font-black tracking-wider uppercase shadow-xs flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        <span>Free Posting for first 50 posts</span>
+                      </div>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3.5">
                         <div
@@ -1094,6 +1120,15 @@ export const CheckoutPayment: React.FC<CheckoutPaymentProps> = ({
                 <span className="text-neutral-500">Student Profile:</span>
                 <span className="font-semibold text-neutral-900">
                   {submission.name} (@{cleanHandle || 'untagged'})
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-neutral-500">Photos Attached:</span>
+                <span className="font-semibold text-neutral-900">
+                  {submission.photoUrls && submission.photoUrls.length > 0
+                    ? `${submission.photoUrls.length} Photo${submission.photoUrls.length > 1 ? 's' : ''}`
+                    : '1 Photo'}
                 </span>
               </div>
 

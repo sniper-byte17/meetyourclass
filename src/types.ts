@@ -39,6 +39,7 @@ export interface Profile {
   linkedin?: string;
   email?: string;
   photoUrl: string;
+  photoUrls?: string[]; // Up to 10 photos
   createdAt: string;
   isUserSubmission?: boolean;
 }
@@ -67,6 +68,7 @@ export interface CheckoutSubmissionData {
   hometown: string;
   bio: string;
   photoUrl: string;
+  photoUrls?: string[]; // Up to 10 photos
   lookingFor: string;
   tags: string[];
   formattedCaption: string;
@@ -85,6 +87,7 @@ export interface StudentSubmission {
   lookingFor: string;
   tags: string[];
   photoUrl: string;
+  photoUrls?: string[]; // Up to 10 photos
   createdAt: string;
   tier: PostingSpeedTier;
   price: number;
@@ -98,6 +101,7 @@ export interface StudentSubmission {
   paymentVerifiedAt?: string;
   paymentVerifiedBy?: string;
   caption: string;
+  queuePosition?: number;
 }
 
 export type AdminRole = 'super_admin' | 'campus_manager' | 'moderator';

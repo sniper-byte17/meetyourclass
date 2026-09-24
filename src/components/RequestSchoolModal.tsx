@@ -12,12 +12,12 @@ export const RequestSchoolModal: React.FC<RequestSchoolModalProps> = ({
   onClose,
   onRequestSubmitted,
 }) => {
-  if (!isOpen) return null;
-
   const [schoolName, setSchoolName] = useState('');
   const [cityState, setCityState] = useState('');
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

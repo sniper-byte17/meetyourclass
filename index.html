@@ -11,6 +11,35 @@
     <meta name="twitter:card" content="summary_large_image" />
     <script>
       (function() {
+        // Intercept and swallow benign AbortErrors globally
+        function isAbort(e) {
+          if (!e) return false;
+          var msg = (e.message || String(e || '')).toLowerCase();
+          var name = e.name || '';
+          return (
+            name === 'AbortError' ||
+            msg.indexOf('abort') !== -1 ||
+            msg.indexOf('the user aborted a request') !== -1 ||
+            msg.indexOf('signal is aborted') !== -1
+          );
+        }
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (isAbort(event.reason)) {
+            event.preventDefault();
+            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('error', function(event) {
+          if (isAbort(event.error) || isAbort(event.message)) {
+            event.preventDefault();
+            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
         try {
           var originalFetch = typeof window !== 'undefined' && window.fetch ? window.fetch.bind(window) : undefined;
           var currentFetch = originalFetch;

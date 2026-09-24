@@ -5,34 +5,38 @@ import './index.css';
 
 // Safely catch and suppress benign browser / DOMException AbortError cancellations
 if (typeof window !== 'undefined') {
-  window.addEventListener('unhandledrejection', (event) => {
-    const reason = event.reason;
-    const msg = reason?.message || String(reason || '');
+  const isAbort = (reason: any) => {
+    const msg = (reason?.message || String(reason || '')).toLowerCase();
     const name = reason?.name || '';
-    if (
+    return (
       name === 'AbortError' ||
       msg.includes('aborted') ||
-      msg.includes('The user aborted a request') ||
-      msg.includes('signal is aborted without reason')
-    ) {
-      event.preventDefault();
-      event.stopImmediatePropagation?.();
-    }
-  });
+      msg.includes('the user aborted a request') ||
+      msg.includes('signal is aborted')
+    );
+  };
 
-  window.addEventListener('error', (event) => {
-    const msg = event.message || event.error?.message || '';
-    const name = event.error?.name || '';
-    if (
-      name === 'AbortError' ||
-      msg.includes('aborted') ||
-      msg.includes('The user aborted a request') ||
-      msg.includes('signal is aborted without reason')
-    ) {
-      event.preventDefault();
-      event.stopImmediatePropagation?.();
-    }
-  });
+  window.addEventListener(
+    'unhandledrejection',
+    (event) => {
+      if (isAbort(event.reason)) {
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+      }
+    },
+    true
+  );
+
+  window.addEventListener(
+    'error',
+    (event) => {
+      if (isAbort(event.error) || isAbort(event.message)) {
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+      }
+    },
+    true
+  );
 }
 
 createRoot(document.getElementById('root')!).render(

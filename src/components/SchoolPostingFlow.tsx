@@ -25,6 +25,7 @@ import {
   Music2,
   Palette,
   Link as LinkIcon,
+  X,
 } from 'lucide-react';
 import { School, Profile, UserRole, PostingSpeedTier, PaymentMode } from '../types';
 import { SAMPLE_AVATARS } from '../data/schoolsData';
@@ -80,7 +81,9 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
   const [gradYear, setGradYear] = useState<number>(2031); // Default to 2031 as requested
   const [major, setMajor] = useState<string>('');
   const [hometown, setHometown] = useState<string>('');
-  const [photoUrl, setPhotoUrl] = useState<string>(SAMPLE_AVATARS[0]);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([SAMPLE_AVATARS[0]]);
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
+  const photoUrl = photoUrls[activePhotoIndex] || photoUrls[0] || SAMPLE_AVATARS[0];
   const [sourceImageForCrop, setSourceImageForCrop] = useState<string>(SAMPLE_AVATARS[0]);
   const [isCropperOpen, setIsCropperOpen] = useState<boolean>(false);
   const [isCropped, setIsCropped] = useState<boolean>(false);
@@ -104,33 +107,87 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
     ? school.instagramHandle
     : `@${school.shortName.toLowerCase().replace(/[^a-z0-9]/g, '')}2031`;
 
-  // File Upload Handler - triggers photo cropper directly
+  // File Upload Handler - allows uploading up to 10 original photos as-is without mandatory cropping
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 8 * 1024 * 1024) {
-        setErrors((prev) => ({ ...prev, photo: 'File size must be under 8MB' }));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          const raw = reader.result;
-          setSourceImageForCrop(raw);
-          setPhotoUrl(raw);
-          setIsCropped(false);
-          setIsCropperOpen(true); // Automatically open the crop modal to crop photo to user's liking!
-          setErrors((prev) => ({ ...prev, photo: '' }));
-        }
-      };
-      reader.readAsDataURL(file);
-      // Reset input value so re-uploading the same image triggers
-      e.target.value = '';
+    const rawFiles: File[] = e.target.files ? Array.from(e.target.files) : [];
+    if (rawFiles.length === 0) return;
+
+    // Check if current list only contains default sample avatar
+    const isOnlyDefaultSample = photoUrls.length === 1 && SAMPLE_AVATARS.includes(photoUrls[0]);
+    const currentList = isOnlyDefaultSample ? [] : [...photoUrls];
+    const availableSlots = 10 - currentList.length;
+
+    if (availableSlots <= 0) {
+      setErrors((prev) => ({ ...prev, photo: 'Maximum 10 photos allowed per post.' }));
+      return;
+    }
+
+    const filesToProcess = rawFiles.slice(0, availableSlots);
+    const oversized = filesToProcess.some((f) => f.size > 8 * 1024 * 1024);
+    if (oversized) {
+      setErrors((prev) => ({ ...prev, photo: 'All image files must be under 8MB each.' }));
+      return;
+    }
+
+    const readers = filesToProcess.map((file) => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') resolve(reader.result);
+          else reject();
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(readers)
+      .then((newImages) => {
+        const updated = [...currentList, ...newImages].slice(0, 10);
+        setPhotoUrls(updated);
+        setActivePhotoIndex(0);
+        setSourceImageForCrop(updated[0]);
+        setIsCropped(false);
+        setErrors((prev) => ({ ...prev, photo: '' }));
+      })
+      .catch((err) => {
+        console.error('Error reading files:', err);
+        setErrors((prev) => ({ ...prev, photo: 'Could not load images. Please try again.' }));
+      })
+      .finally(() => {
+        e.target.value = '';
+      });
+  };
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    if (photoUrls.length <= 1) {
+      // Revert to sample avatar if all removed
+      setPhotoUrls([SAMPLE_AVATARS[0]]);
+      setActivePhotoIndex(0);
+      setSourceImageForCrop(SAMPLE_AVATARS[0]);
+      return;
+    }
+    const updated = photoUrls.filter((_, idx) => idx !== indexToRemove);
+    setPhotoUrls(updated);
+    if (activePhotoIndex >= updated.length) {
+      setActivePhotoIndex(updated.length - 1);
     }
   };
 
+  const handleSetCoverPhoto = (indexToCover: number) => {
+    if (indexToCover === 0 || indexToCover >= photoUrls.length) return;
+    const target = photoUrls[indexToCover];
+    const remaining = photoUrls.filter((_, idx) => idx !== indexToCover);
+    const updated = [target, ...remaining];
+    setPhotoUrls(updated);
+    setActivePhotoIndex(0);
+    setSourceImageForCrop(updated[0]);
+  };
+
   const handleCropComplete = (croppedDataUrl: string) => {
-    setPhotoUrl(croppedDataUrl);
+    const updated = [...photoUrls];
+    updated[activePhotoIndex] = croppedDataUrl;
+    setPhotoUrls(updated);
     setIsCropped(true);
     setErrors((prev) => ({ ...prev, photo: '' }));
     setCropSuccessToast(true);
@@ -207,6 +264,7 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
       instagram: cleanHandle || undefined,
       tiktok: cleanTikTok || undefined,
       photoUrl,
+      photoUrls,
       createdAt: new Date().toISOString().split('T')[0],
       isUserSubmission: true,
     };
@@ -246,6 +304,7 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
           hometown: hometown.trim(),
           bio: bio.trim(),
           photoUrl,
+          photoUrls,
           lookingFor,
           tags,
           formattedCaption,
@@ -273,6 +332,7 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
             lookingFor,
             tags,
             photoUrl,
+            photoUrls,
             tier: orderData.tier,
             price: orderData.amount,
             status: 'queued',
@@ -685,56 +745,81 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
             </div>
 
             {/* Photo Upload Area */}
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                Portrait Photo *
-              </label>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                    Portrait & Carousel Photos (Up to 10 Photos) *
+                  </label>
+                  <p className="text-xs text-neutral-500">
+                    Upload original photos as-is. Photo #1 is your official {school.shortName} cover slide!
+                  </p>
+                </div>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-pink-50 text-pink-700 border border-pink-200">
+                  {photoUrls.length}/10 Photos
+                </span>
+              </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-2xl bg-neutral-50 border border-neutral-200">
-                <div
-                  onClick={() => {
-                    setSourceImageForCrop(sourceImageForCrop || photoUrl);
-                    setIsCropperOpen(true);
-                  }}
-                  className="relative group w-32 h-40 sm:w-36 sm:h-44 rounded-2xl overflow-hidden bg-neutral-900 border-2 border-white shadow-md shrink-0 cursor-pointer"
-                  title="Click to crop and adjust photo"
-                >
-                  <SchoolPhotoTemplate
-                    photoUrl={photoUrl}
-                    school={school}
-                    studentInstagram={cleanHandle}
-                    studentName={name}
-                    gradYear={gradYear}
-                    major={major}
-                    hometown={hometown}
-                    className="w-full h-full"
-                    showWatermark={false}
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 text-white text-xs font-bold transition-opacity z-10">
-                    <Crop className="w-5 h-5 text-pink-400" />
-                    <span>{isCropped ? 'Re-crop Photo' : 'Crop Photo'}</span>
-                  </div>
-                  {isCropped && (
-                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold shadow-md flex items-center gap-1 z-10">
-                      <Check className="w-3 h-3" />
-                      <span>Cropped</span>
+              {/* Helper Note for Original Photos & Instagram Cropping */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200/80 text-xs text-neutral-800 space-y-1">
+                <div className="flex items-center gap-2 font-bold text-blue-900">
+                  <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Original Photos Allowed • No Mandatory Pre-Cropping</span>
+                </div>
+                <p className="text-[11px] text-neutral-600 leading-relaxed pl-6">
+                  💡 <strong>Pro-Tip:</strong> You can upload your original photos as-is! Pre-cropping is completely optional. You and our campus team can download the original images and adjust/crop them directly inside Instagram prior to posting.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 p-4 sm:p-5 rounded-2xl bg-neutral-50 border border-neutral-200">
+                {/* Active Photo / Template Preview */}
+                <div className="flex flex-col items-center gap-2 shrink-0">
+                  <div
+                    onClick={() => {
+                      setSourceImageForCrop(photoUrl);
+                      setIsCropperOpen(true);
+                    }}
+                    className="relative group w-36 h-44 sm:w-40 sm:h-50 rounded-2xl overflow-hidden bg-neutral-900 border-2 border-white shadow-md cursor-pointer"
+                    title="Click to optionally crop or adjust active photo"
+                  >
+                    <SchoolPhotoTemplate
+                      photoUrl={photoUrl}
+                      school={school}
+                      studentInstagram={cleanHandle}
+                      studentName={name}
+                      gradYear={gradYear}
+                      major={major}
+                      hometown={hometown}
+                      className="w-full h-full"
+                      showWatermark={false}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 text-white text-xs font-bold transition-opacity z-10">
+                      <Crop className="w-5 h-5 text-pink-400" />
+                      <span>{isCropped ? 'Re-crop Photo' : 'Optional Crop'}</span>
                     </div>
-                  )}
+                    {isCropped && (
+                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold shadow-md flex items-center gap-1 z-10">
+                        <Check className="w-3 h-3" />
+                        <span>Cropped</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 text-white text-[10px] font-bold backdrop-blur-xs z-10">
+                      {activePhotoIndex === 0 ? 'Cover Slide' : `Photo #${activePhotoIndex + 1}`}
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-medium text-neutral-500">
+                    {activePhotoIndex === 0 ? '✨ Cover Template Preview' : `Slide #${activePhotoIndex + 1} Preview`}
+                  </span>
                 </div>
 
-                <div className="space-y-3 flex-1 text-center sm:text-left">
-                  {/* Template info pill */}
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200/80 text-[11px] text-neutral-700 font-medium">
-                    <Palette className="w-3.5 h-3.5 text-pink-600 shrink-0" />
-                    <span>
-                      <strong>Custom Campus Template:</strong> University colors ({school.shortName}), student tag on top, and school IG at bottom.
-                    </span>
-                  </div>
+                <div className="space-y-4 flex-1 w-full text-center sm:text-left">
+                  {/* Action buttons */}
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                     <input
                       ref={fileInputRef}
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={handleFileUpload}
                       className="hidden"
                     />
@@ -742,24 +827,25 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
                       type="button"
                       id="btn-upload-photo-step1"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-600 via-rose-500 to-purple-600 hover:opacity-95 text-white text-xs sm:text-sm font-bold py-2.5 px-4 rounded-xl shadow-xs transition-opacity cursor-pointer"
+                      disabled={photoUrls.length >= 10}
+                      className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-600 via-rose-500 to-purple-600 hover:opacity-95 text-white text-xs sm:text-sm font-bold py-2.5 px-4 rounded-xl shadow-xs transition-opacity cursor-pointer disabled:opacity-50"
                     >
                       <Upload className="w-4 h-4" />
-                      <span>Upload Your Photo</span>
+                      <span>{photoUrls.length >= 10 ? 'Limit Reached (10/10)' : 'Upload Photos (Up to 10)'}</span>
                     </button>
 
                     <button
                       type="button"
                       id="btn-crop-photo-step1"
                       onClick={() => {
-                        setSourceImageForCrop(sourceImageForCrop || photoUrl);
+                        setSourceImageForCrop(photoUrl);
                         setIsCropperOpen(true);
                       }}
                       className="inline-flex items-center gap-1.5 bg-white hover:bg-neutral-100 text-neutral-800 text-xs sm:text-sm font-bold py-2.5 px-3.5 rounded-xl border border-neutral-300 shadow-xs transition-colors cursor-pointer"
                       title="Adjust crop, zoom, rotation or aspect ratio"
                     >
                       <Crop className="w-4 h-4 text-pink-600" />
-                      <span>Crop / Adjust</span>
+                      <span>Crop Active Photo</span>
                     </button>
 
                     <span className="text-xs text-neutral-400">JPG, PNG under 8MB</span>
@@ -774,18 +860,97 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold shadow-xs"
                       >
                         <Check className="w-4 h-4 text-emerald-600" />
-                        <span>Photo cropped & framing updated successfully!</span>
+                        <span>Photo framing updated successfully!</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
-                  <p className="text-[11px] text-neutral-500">
-                    💡 Uploading a photo opens the interactive cropper. You can crop to 4:5 (Instagram portrait), square, zoom, rotate, or reposition anytime.
-                  </p>
-
                   {errors.photo && (
                     <p className="text-xs font-semibold text-rose-600">{errors.photo}</p>
                   )}
+
+                  {/* Multi-Photo Carousel / Grid Thumbnails */}
+                  <div className="space-y-2 pt-1 border-t border-neutral-200/70">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-neutral-700">
+                        Uploaded Photos ({photoUrls.length}/10):
+                      </span>
+                      {activePhotoIndex !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetCoverPhoto(activePhotoIndex)}
+                          className="text-[11px] font-bold text-pink-600 hover:text-pink-700 cursor-pointer"
+                        >
+                          Make Active Photo Cover
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 overflow-x-auto py-1">
+                      {photoUrls.map((url, idx) => {
+                        const isActive = idx === activePhotoIndex;
+                        const isCover = idx === 0;
+                        return (
+                          <div
+                            key={idx}
+                            className={`relative group w-14 h-16 sm:w-16 sm:h-20 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                              isActive
+                                ? 'border-pink-600 ring-2 ring-pink-400/40 scale-105 shadow-sm'
+                                : 'border-neutral-300 opacity-80 hover:opacity-100'
+                            }`}
+                            onClick={() => {
+                              setActivePhotoIndex(idx);
+                              setSourceImageForCrop(url);
+                            }}
+                          >
+                            <img
+                              src={url}
+                              alt={`Photo ${idx + 1}`}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Cover Badge */}
+                            {isCover && (
+                              <span className="absolute top-1 left-1 px-1 py-0.5 rounded bg-pink-600 text-white text-[8px] font-extrabold leading-none shadow-xs">
+                                Cover
+                              </span>
+                            )}
+                            {!isCover && (
+                              <span className="absolute top-1 left-1 px-1 py-0.5 rounded bg-black/60 text-white text-[8px] font-bold leading-none">
+                                #{idx + 1}
+                              </span>
+                            )}
+
+                            {/* Delete Button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemovePhoto(idx);
+                              }}
+                              className="absolute top-1 right-1 w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-700 cursor-pointer"
+                              title="Remove photo"
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {/* Add more button */}
+                      {photoUrls.length < 10 && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-14 h-16 sm:w-16 sm:h-20 rounded-xl border-2 border-dashed border-neutral-300 hover:border-pink-500 bg-white hover:bg-pink-50/40 flex flex-col items-center justify-center gap-1 text-neutral-500 hover:text-pink-600 transition-colors shrink-0 cursor-pointer"
+                          title="Add more photos"
+                        >
+                          <Upload className="w-4 h-4" />
+                          <span className="text-[9px] font-bold">+Add</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Sample selection */}
                   <div>
@@ -798,7 +963,8 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
                           key={idx}
                           type="button"
                           onClick={() => {
-                            setPhotoUrl(url);
+                            setPhotoUrls([url]);
+                            setActivePhotoIndex(0);
                             setSourceImageForCrop(url);
                             setIsCropped(false);
                           }}
@@ -1251,18 +1417,57 @@ export const SchoolPostingFlow: React.FC<SchoolPostingFlowProps> = ({
                 </div>
 
                 <div className="relative aspect-4/5 w-full bg-neutral-900 overflow-hidden">
-                  <SchoolPhotoTemplate
-                    photoUrl={photoUrl}
-                    school={school}
-                    studentInstagram={cleanHandle}
-                    studentName={name}
-                    gradYear={gradYear}
-                    major={major}
-                    hometown={hometown}
-                    className="w-full h-full"
-                    showWatermark={true}
-                  />
+                  {activePhotoIndex === 0 ? (
+                    <SchoolPhotoTemplate
+                      photoUrl={photoUrl}
+                      school={school}
+                      studentInstagram={cleanHandle}
+                      studentName={name}
+                      gradYear={gradYear}
+                      major={major}
+                      hometown={hometown}
+                      className="w-full h-full"
+                      showWatermark={true}
+                    />
+                  ) : (
+                    <div className="w-full h-full relative">
+                      <img
+                        src={photoUrl}
+                        alt={`Slide ${activePhotoIndex + 1}`}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/70 text-white text-[10px] font-bold backdrop-blur-xs">
+                        Carousel Slide #{activePhotoIndex + 1}
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                {/* Multi-Photo Carousel Switcher for Step 4 Preview */}
+                {photoUrls.length > 1 && (
+                  <div className="p-2.5 bg-neutral-100/90 border-b border-neutral-200 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-neutral-600">
+                      Slide {activePhotoIndex + 1} of {photoUrls.length}:
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {photoUrls.map((_, pIdx) => (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => setActivePhotoIndex(pIdx)}
+                          className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center transition-all cursor-pointer ${
+                            activePhotoIndex === pIdx
+                              ? 'bg-pink-600 text-white shadow-xs'
+                              : 'bg-white text-neutral-600 border border-neutral-300 hover:bg-neutral-200'
+                          }`}
+                        >
+                          {pIdx + 1}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="p-4 space-y-2 bg-neutral-50/70">
                   <div className="flex items-center justify-between text-neutral-600">

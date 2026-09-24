@@ -415,11 +415,13 @@ export const PhotoCropperModal: React.FC<PhotoCropperModalProps> = ({
             fallback.src = blobUrl;
           })
           .catch((err) => {
-            // If aborted or failed CORS, safely fallback to direct image load without rejecting
-            if (err?.name === 'AbortError') return;
+            // If aborted or failed CORS, safely fallback to direct image load without throwing
             const direct = new Image();
             direct.onload = () => resolve(direct);
-            direct.onerror = (e) => reject(e);
+            direct.onerror = () => {
+              // Still resolve with direct image element so canvas can attempt or gracefully fallback
+              resolve(direct);
+            };
             direct.src = src;
           });
       };

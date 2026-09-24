@@ -49,6 +49,7 @@ export default function App() {
   const [isRequestSchoolOpen, setIsRequestSchoolOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [adminPortalMode, setAdminPortalMode] = useState<'poster' | 'master'>('poster');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Synchronize with backend API on mount
@@ -176,7 +177,6 @@ export default function App() {
         onNavigateToSchools={handleNavigateToSchools}
         onNavigateToSteps={handleNavigateToSteps}
         onOpenHelp={() => setIsHelpOpen(true)}
-        onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
       {/* Toast Notification */}
@@ -230,11 +230,12 @@ export default function App() {
         onNavigateToSteps={handleNavigateToSteps}
       />
 
-      {/* Admin Backend Queue Modal */}
+      {/* Dual Admin / Community Queue Modal */}
       <AdminModal
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
         schools={schools}
+        initialPortalMode={adminPortalMode}
       />
 
       {/* Footer */}
@@ -278,19 +279,29 @@ export default function App() {
             </button>
             <span>•</span>
             <button
-              onClick={() => setIsRequestSchoolOpen(true)}
-              className="hover:text-pink-600 transition-colors cursor-pointer"
+              id="footer-poster-portal-btn"
+              onClick={() => {
+                setAdminPortalMode('poster');
+                setIsAdminOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 transition-colors cursor-pointer font-bold border border-blue-200"
+              title="Campus Poster Portal: Search school, view requests & download IG graphics"
             >
-              Request School
+              <Instagram className="w-3.5 h-3.5 text-blue-600" />
+              <span>School Poster Portal</span>
             </button>
             <span>•</span>
             <button
-              id="footer-admin-portal-btn"
-              onClick={() => setIsAdminOpen(true)}
-              className="inline-flex items-center gap-1 text-neutral-800 hover:text-pink-600 transition-colors cursor-pointer font-bold"
+              id="footer-master-analytics-btn"
+              onClick={() => {
+                setAdminPortalMode('master');
+                setIsAdminOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-pink-50 text-neutral-800 hover:text-pink-700 transition-colors cursor-pointer font-bold border border-neutral-200 hover:border-pink-200"
+              title="Master Analytics Admin: Revenue metrics, top earning schools & graphs"
             >
-              <Shield className="w-3 h-3 text-pink-500" />
-              <span>Admin Portal</span>
+              <Shield className="w-3.5 h-3.5 text-pink-600" />
+              <span>Master Analytics</span>
             </button>
           </div>
         </div>
